@@ -4,7 +4,7 @@ A presentation on best practices for Pattern Matching in Clojure.
 
 ## Usage
 
-[Click to view the presentation]()
+[Click to view the presentation](http://htmlpreview.github.io/?https://github.com/belucid/clj-pattern-matching/blob/master/presentation.html)
 
 ## License
 
