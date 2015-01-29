@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pattern Matching in Clojure: Best Practices</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+      
+      @import url("http://fonts.googleapis.com/css?family=Lato");
+      @import url("http://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic");
+      @import url("http://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic");
+
+      body { 
+        font-family: 'Droid Serif';
+      }
+
+      .remark-slide-container, .remark-slide, .remark-slide-content {
+        background-image: url("http://posthere.io/images/gray_jean.png");
+        background-repeat: repeat;
+      }
+
+      h1, h2, h3 {
+        font-family: 'Lato';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+
+      div.title-slide code.remark-code {
+        font-size: larger;
+      }
+
+      ul li {
+        font-size: larger;
+        padding: 15px;
+      }
+
+      ul li ul li {
+        font-size: smaller;
+        padding: 10px;
+      }
+
+      .footnote {
+        position: absolute;
+        bottom: 3em;
+      }
+
+      </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle, title-slide
+
+# Pattern Matching in Clojure
+
+```clojure
+([practices :guard (contains? % :best)] true)
+```
+
+.footnote[[Sean Johnson](http://github.com/SnootyMonkey) - [Path](http://path.com/)]
+
+---
+
+class: center, middle, title-slide
+
+## Feel free to follow along:
+
+Presentation with clickable links:
+
+[URL](http://cnn.com)
+
+
+Code:
+
+[http://github.com/belucid/clj-pattern-matching](http://github.com/belucid/clj-pattern-matching)
+
+---
+
+# How's this gonna go?
+
+* How did we get here? (historic detour)
+* How-to:
+  * Clojure destructuring (proto-pattern matching thinking)
+  * Clojure multimethods (here we go...)
+  * case macro (we're matching patterns)
+  * core.match (now we're talking!)
+  * defun (yes please!)
+* Real-world practice
+  * Gotchas
+  * Real-world examples
+
+---
+
+class: center, middle
+
+## Code heavy.
+
+--
+
+No live coding. Sorry.
+
+---
+
+class: center, middle
+
+## Code heavy.
+
+Mostly real-world examples.
+
+---
+
+class: center, middle
+
+## Code heavy.
+
+No Fibonacci or factorial. I promise!
+
+---
+
+# How did we get here?
+
+* When mommies and daddies love each other very much...
+
+---
+
+# How did we get here?
+
+* Pattern matching has a very rich history in CS / PL
+* SNOBOL in the '60's and '70's - string, proto-regex
+* Prolog in early '70's - unification
+* NPL in late '70's - functional and pattern matching
+  * [NPL](http://en.wikipedia.org/wiki/NPL_%28programming_language%29) → [Hope](http://en.wikipedia.org/wiki/Hope_%28programming_language%29)
+* KRC in the '80's - functional, pattern matching, and laziness
+  * [KRC](http://en.wikipedia.org/wiki/Kent_Recursive_Calculator)
+* Erlang (1987) - functional, pattern matching, immutability
+
+---
+
+layout: true
+
+# Hdwgh? - [Prolog]() (1972)
+
+Pattern matching against facts/rules: [Unification](http://en.wikipedia.org/wiki/Unification_%28computer_science%29)
+
+---
+
+---
+
+```
+vertical(line(point(X,Y),point(X,Z))). 
+    
+horizontal(line(point(X,Y),point(Z,Y))).
+```
+
+.footnote[[Learn Prolog Now!](http://www.learnprolognow.org/lpnpage.php?pagetype=html&pageid=lpn-htmlse5)]
+
+--
+
+```
+?- vertical(line(point(1,1),point(1,4))). 
+yes
+
+?- vertical(line(point(1,1),point(2,4))). 
+no
+```
+
+--
+
+```
+append([],L,L). 
+append([H|T],L2,[H|L3]) :- append(T,L2,L3).
+```
+
+.footnote[[Learn Prolog Now!](http://www.learnprolognow.org/lpnpage.php?pagetype=html&pageid=lpn-htmlse5)]
+
+---
+
+```
+?- append([a,b,c],[1,2,3],L3).
+L3 = [a,b,c,1,2,3] 
+yes
+```
+
+--
+
+Unification is 2-way, "pattern matching" is 1-way
+
+--
+
+```
+?- append([a,b,c],L2,[a,b,c,1,2,3]).
+L2 = [1,2,3] 
+yes
+```
+
+--
+
+Successively constraining expressions.
+
+--
+
+Runs forward and backward. Multiple matches. Backtracking.
+
+--
+
+Deep: Papers, Dissertations, Books, Lifetimes
+
+--
+
+Not dead yet! IBM Watson
+
+---
+
+layout: true
+
+# Hdwgh? - [Erlang](http://www.erlang.org/) (1987)
+
+---
+
+* Erlang implemented in Prolog (then in Erlang)
+  * Borrowed Prolog syntax (but now there is [Elixir](http://elixir-lang.org/) and [LFE](http://lfe.io/))
+* Robustness - concurrent, soft real-time, 99.9999999%
+  * Concurrency primitives
+  * Error primitives
+* No unification, no back-tracking
+  * Single assigment
+  * Immutable data
+* Rich pattern matching
+
+---
+
+Psuedocode -
+
+```
+function(Args)
+  if X then
+    Expression
+  else if Y then
+    Expression
+  else
+    Expression
+```
+
+Erlang equivalent -
+
+```
+function(X) ->
+  Expression;
+function(Y) ->
+  Expression;
+function(_) ->
+  Expression.
+```
+
+.footnote[[Learn You Some Erlang](http://learnyousomeerlang.com/syntax-in-functions)]
+
+---
+
+Erlang guard expression:
+
+```
+old_enough(Age) when Age >= 18 -> true;
+old_enough(_) -> false.
+```
+
+.footnote[[Learn You Some Erlang](http://learnyousomeerlang.com/syntax-in-functions)]
+
+--
+
+"One negative point about guards is that they will not accept user-defined functions because of side effects."
+
+---
+
+
+```
+case Temperature of
+  {celsius, N} when N >= 20, N =< 45 -> 'favorable';
+  {kelvin, N} when N >= 293, N =< 318 -> 'scientifically favorable';
+  {fahrenheit, N} when N >= 68, N =< 113 -> 'favorable in the US';
+  _ -> 'avoid beach'
+```
+
+.footnote[[Learn You Some Erlang](http://learnyousomeerlang.com/syntax-in-functions)]
+
+---
+
+layout: false
+
+class: center, middle, title-slide
+
+# What about us?
+
+![Clojure](http://verse.aasemoon.com/images/5/51/Clojure-Logo.png)
+
+---
+
+class: center, middle, title-slide
+
+# Foreshadowing: macros FTW!
+
+![Clojure](http://verse.aasemoon.com/images/5/51/Clojure-Logo.png)
+
+---
+
+# Pattern Matching Thinking
+
+**Destructuring** is a mini pattern extraction language in Clojure.
+
+```clojure
+  ;; a list
+  (def besties ["mary" "sally" "bob" "sue"])
+
+  ;; a pattern extracted with destructuring
+* (let [[best second & more :as full-list] besties]
+    (println "1st:" best "2nd:" second "more:" more "list:" full-list))
+
+1st: mary 2nd: sally more: (bob sue) list: [mary sally bob sue]
+```
+
+---
+
+# Pattern Matching Thinking
+
+**Destructuring** is a mini pattern extraction language in Clojure.
+
+```clojure
+  ;; a map
+  (def config {
+    :db :couch
+    :user "steve"
+    :name "db-of-stuff"
+    :password "open-sesame"
+    :port 4242})
+
+  (defn start
+    "arguments extracted with destructuring"
+*   [{db :db user :user :as config}]
+    ...
+    (println user "is opening" db)
+    ...)
+
+=> (start config)
+steve is opening :couch
+```
+
+---
+
+# Pattern Matching Thinking
+
+**Destructuring** is a mini pattern extraction language in Clojure.
+
+```clojure
+  ;; a map
+  (def config {
+    :db :couch
+    :user "steve"
+    :name "db-of-stuff"
+    :password "open-sesame"
+    :port 4242})
+
+  (defn start
+    "arguments extracted with destructuring and defaults"
+*   [{db :db user :user day :day :or {day "Monday"} :as config}]
+    ...
+    (println user "is opening" db "on" day)
+    ...)
+
+=> (start config)
+steve is opening :couch on Monday
+```
+
+---
+
+# Pattern Matching Thinking
+
+**Destructuring** is a mini pattern extraction language in Clojure.
+
+```clojure
+  ;; a map
+  (def config {
+    :db :couch
+    :user "steve"
+    :name "db-of-stuff"
+    :password "open-sesame"
+    :port 4242})
+
+  (defn start
+    "arguments extracted with destructuring"
+*   [{:keys [db user password] day :day :or {day "Monday"} :as config}]
+    ...
+    (println user "is opening" db "with" password "on" day)
+    ...)
+
+=> (start config)
+steve is opening :couch with open-sesame on Monday
+
+```
+
+---
+
+# Pattern Matching Thinking
+
+**Destructuring** is a mini pattern extraction language in Clojure.
+
+* sequential - position, `&`, `:as`
+* associative - key,  `:keys`,  `:or`,  `:as`
+
+---
+
+# Specialized Pattern Matching
+
+Clojure **multimethods** pattern match on a dispatching value.
+
+```clojure
+(defmulti order-list
+  "
+  [_ market-id transaction-type]
+  
+  Return a vector of maps of the orders in the order book on the exchange for the type of transaction
+  (:buy or :sell) in the market identified by the id.
+
+  For each order, include the volume and price as floats.
+
+  Example result:
+
+  [
+    {:volume 9.082243 :price 7.6499E-4}
+    {:volume 1.650574 :price 7.6498E-4}
+    {:volume 0.13710514 :price 7.3867E-4}
+  ]
+  "
+  (fn [exchange market-id transaction-type] (:exchange exchange)))
+```
+
+--
+
+Clojure's functional brand of runtime polymorphism.
+
+--
+
+Dispatching function uses a dispatch value that will be matched to call the right method.
+
+---
+
+# Specialized Pattern Matching
+
+Clojure **multimethods** pattern match on a dispatching value.
+
+```clojure
+(defmethod order-list :cryptsy [_ market-id transaction-type]
+  (let [order-fn (if (= transaction-type :sell) buy-order-result sell-order-result)]
+    (vec (map order-fn ((order-book-name transaction-type) (result-of #(market-orders market-id)))))))
+```
+
+```clojure
+(service/order-list {:exchange :cryptsy} "ltc_btc" :sell)
+```
+
+--
+
+Dispatch value is often a keyword, but doesn't have to be.
+
+--
+
+Dispatching can have a `:default`, `prefer-method` ordering, and [much more](http://clojure.org/multimethods).
+
+---
+
+layout: true
+
+# Pattern Matching
+
+**case** is a very simple pattern-matching macro.
+
+---
+
+```clojure
+(defn- unprocessable-reason [reason]
+  (case reason
+    :bad-collection common/missing-collection-response
+    :bad-item common/missing-response
+    :no-name (common/unprocessable-entity-response "Name is required.")
+    :property-conflict (common/unprocessable-entity-response "A reserved property was used.")
+    :slug-conflict (common/unprocessable-entity-response "Slug already used in the collection.")
+    :invalid-slug (common/unprocessable-entity-response "Invalid slug.")
+    (common/unprocessable-entity-response "Not processable.")))
+```
+
+--
+
+"The test-constants are not evaluated. They must be compile-time
+literals, and need not be quoted."
+
+---
+
+"All manner of constant expressions are acceptable in case, including **numbers**, **strings**,
+**symbols**, **keywords**, and (Clojure) composites thereof...
+
+...lists are used to group multiple constants that map to the same expression...
+
+The test-constants need not be all of the same type."
+
+--
+
+```clojure
+(defn quantity [count]
+  (case count
+    0 "none"
+    1 "one"
+    (2 3 "many") "some"
+    "lots"))
+
+=> (quantity 0)
+"none"
+=> (quantity "many")
+"some"
+=> (quantity 4)
+"lots"
+```
+
+---
+
+"The test-constants **are not evaluated**. They must be compile-time literals, and need not be quoted."
+
+--
+
+But...
+
+```clojure
+(contains? _ :foo)
+
+(> _ 47)
+
+(or (not (and (sequential? _) (empty? _)) ...)
+```
+
+--
+
+Sure, there's cond, condp...
+
+--
+
+Don't we have a superpower? (And a superhero?)
+
+---
+
+layout: false
+
+# Pattern Matching
+
+**core.match** is a powerful pattern-matching macro.
+
+[https://github.com/clojure/core.match](https://github.com/clojure/core.match)
+
+```clojure
+:dependencies [
+  [org.clojure/clojure "1.6.0"]
+* [org.clojure/core.match "0.3.0-alpha4"]
+  ...
+]
+```
+
+```clojure
+  (ns fcms.api.collections
+*   (:require [clojure.core.match :refer (match)]
+              ...
+```
+
+![David Nolen](http://2013.webrebels.org/gfx/speaker_david.jpg)
+[David Nolen](https://github.com/swannodette)
+
+"An optimized pattern matching library for Clojure."
+
+---
+
+layout: true
+
+# Pattern Matching
+
+[**core.match**](https://github.com/clojure/core.match) is a powerful pattern-matching macro.
+
+---
+
+```clojure
+(match angles
+  [60 60 60] :equilateral
+  [90 b c] :right
+  [a 90 c] :right
+  [a b 90] :right
+  [_ :guard #(> % 90) _ _] :obtuse
+  [_ _ :guard #(> % 90) _] :obtuse
+  [_ _ _ :guard #(> % 90)] :obtuse
+  :else (and (triangle? angles) :acute))
+```
+
+---
+
+```clojure
+(match angles
+* [60 60 60] :equilateral
+  [90 b c] :right
+  [a 90 c] :right
+  [a b 90] :right
+  [_ :guard #(> % 90) _ _] :obtuse
+  [_ _ :guard #(> % 90) _] :obtuse
+  [_ _ _ :guard #(> % 90)] :obtuse
+  :else (and (triangle? angles) :acute))
+```
+
+literals match (like case)
+
+---
+
+```clojure
+(match angles
+  [60 60 60] :equilateral
+* [90 b c] :right
+* [a 90 c] :right
+* [a b 90] :right
+  [_ :guard #(> % 90) _ _] :obtuse
+  [_ _ :guard #(> % 90) _] :obtuse
+  [_ _ _ :guard #(> % 90)] :obtuse
+  :else (and (triangle? angles) :acute))
+```
+
+literals match (like case)
+
+vars always match, and are bound
+
+---
+
+```clojure
+(match angles
+  [60 60 60] :equilateral
+  [90 b c] :right
+  [a 90 c] :right
+  [a b 90] :right
+* [_ :guard #(> % 90) _ _] :obtuse
+* [_ _ :guard #(> % 90) _] :obtuse
+* [_ _ _ :guard #(> % 90)] :obtuse
+  :else (and (triangle? angles) :acute))
+```
+
+literals match (like case)
+
+vars always match, and are bound
+
+`_` always match, and idiomatically signals you don't care about the binding
+
+--
+
+`:guard` named arity/1 function or anonymous function must evaluate to true
+
+```clojure
+(match input
+    [val :guard odd? stuff true] (do (great val)(things stuff))
+    [val :guard #(and (odd? %) (> % 10)) _ false] (sorry val))
+```
+
+---
+
+```clojure
+(match angles
+  [60 60 60] :equilateral
+  [90 b c] :right
+  [a 90 c] :right
+  [a b 90] :right
+  [_ :guard #(> % 90) _ _] :obtuse
+  [_ _ :guard #(> % 90) _] :obtuse
+  [_ _ _ :guard #(> % 90)] :obtuse
+* :else (and (triangle? angles) :acute))
+```
+
+:else - default case, always matches
+
+--
+
+```clojure
+(match [input]
+    [val :guard odd? stuff true] (do (great val)(things stuff))
+    [val :guard #(and (odd? %) (> % 10)) _ false] (sorry val))
+```
+
+`IllegalArgumentException` No matching clause: [42 [:foo :bar] true]
+
+---
+
+```clojure
+(match input
+* {:key "foo"} (println "Key is foo.")
+  {:key _} (println "Key is something!")
+  :else (println "No key."))
+```
+
+`{:key "foo"}` - matches specific key/value in a map
+
+---
+
+```clojure
+(match input
+  {:key "foo"} (println "Key is foo.")
+* {:key _} (println "Key is something!")
+  :else (println "No key."))
+```
+
+`{:key "foo"}` - matches specific key/value in a map
+
+`{:key _}` - equivalent to `(contains? % :key)`
+
+---
+
+`[val :only [:vec :of :keys]]` - matches when these are the only keys
+
+`(:or "list" :of 4 "things")` - matches on any of these; notice, no binding
+
+`&` - to bind the rest, as in destructuring
+
+`:seq` - to match a literal sequence
+
+.footnote[I've never used these.]
+
+---
+
+ClojureScript
+
+```clojure
+(:require [cljs.core.match :refer-macros [match]])
+```
+
+---
+
+```clojure
+(match [value]
+
+  ;; 3.4.2) If value is null, remove the base IRI of result.
+  [_ :guard not] (dissoc result "@base")
+
+  ;; 3.4.3) Otherwise, if value is an absolute IRI, the base IRI of result is set to value.
+  [value :guard absolute-iri?] (assoc result "@base" value)
+
+  ;; 3.4.4) Otherwise, if value is a relative IRI and the base IRI of result is not null,
+  ;; set the base IRI of result to the result of resolving value against the current base IRI
+  ;; of result.
+  [value :guard #(and (string? %) (not (s/blank? (get result "@base"))))]
+    (assoc result "@base" (u/resolve (get result "@base") value))
+
+  ;; 3.4.5) Otherwise, an invalid base IRI error has been detected and processing is aborted.
+  :else (json-ld-error "invalid base IRI"
+        "local context @base has a relative IRI, and there is no absolute @base IRI in the active context"))))
+```
+---
+
+```clojure
+(match [prefix suffix]
+
+  ;; 4.2) If prefix is underscore (_) or suffix begins with double-forward-slash (//), return value as it is
+  ;; already an absolute IRI or a blank node identifier.
+  ["_" _] value
+  [_ (suffix :guard #(re-find #"^//" %))] value
+
+  ;; 4.4) If active context contains a term definition for prefix, return the result of concatenating the IRI
+  ;; mapping associated with prefix and suffix.
+  [prefix :guard #(get active-context %) suffix] (str (get active-context prefix) suffix)
+
+  ;; 4.5) Return value as it is already an absolute IRI.
+  :else value)))
+```
+
+---
+
+```clojure
+(match [value]
+  ;; 6) If value is null or value is a JSON object containing the key-value pair @id-null, set
+  ;; the term definition in active context to null, set the value associated with defined's key
+  ;; term to true, and return.
+  [nil] [(assoc updated-context term nil) (assoc defined term true)]
+  [_ :guard #(and
+              (associative? %)
+              (and
+                (contains? % "@id")
+                (= (get % "@id") nil)))]
+    [(assoc updated-context term nil) (assoc defined term true)]
+
+  ;; 7) Otherwise, if value is a string, convert it to a JSON object consisting of a
+  ;; single member whose key is @id and whose value is value.
+  [value :guard string?] [(assoc updated-context term {"@id" value}) (assoc defined term true)]
+
+  ;; 8) Otherwise, value must be a JSON object...
+  [_ :guard map?]
+    ;; 9) Create a new term definition, definition.
+    (new-term-definition active-context local-context term defined)
+
+  ;; 8) ... if not, an invalid term definition
+  ;; error has been detected and processing is aborted.
+  :else (json-ld-error "invalid term definition"
+    (str "The term " term " in the local context is not valid."))
+```
+
+---
+
+layout: false
+
+# Pattern Matching
+
+[**core.match**](https://github.com/clojure/core.match) is a powerful pattern-matching macro **with run-time extensibility**.
+
+Extend the pattern matching language.
+
+Add additional modifiers.
+
+[https://github.com/clojure/core.match/wiki/Advanced-usage](https://github.com/clojure/core.match/wiki/Advanced-usage)
+
+---
+
+layout: false
+
+# Pattern Matching
+
+**defun** is a pattern matching macro for defining functions.
+
+[https://github.com/killme2008/defun](https://github.com/killme2008/defun)
+
+```clojure
+:dependencies [
+  [org.clojure/clojure "1.6.0"]
+* [defun "0.2.0-RC"]
+  ...
+]
+```
+
+```clojure
+  (ns posthere.capture-request
+*   (:require [defun :refer (defun defun-)]
+              ...
+```
+
+!["Dennis" Zhuang Xiaodan](https://avatars3.githubusercontent.com/u/14142?v=3&s=115)
+["Dennis" Zhuang Xiaodan](https://github.com/killme2008)
+
+"A macro to define Clojure functions with pattern matching just as Erlang or Elixir."
+
+---
+
+layout: true
+# Pattern Matching
+
+[**defun**](https://github.com/killme2008/defun) is a pattern matching macro for defining functions.
+
+---
+
+```clojure
+(defun say-hi
+  ([:dennis] "Hi,good morning, dennis.")
+  ([:catty] "Hi, catty, what time is it?")
+  ([:green] "Hi,green, what a good day!")
+  ([other] (str "Say hi to " other)))
+```
+
+```clojure
+(defun valid-geopoint?
+  ([(_ :guard #(and (> % -180) (< % 180)))
+    (_ :guard #(and (> % -90) (< % 90)))] true)
+  ([_ _] false))
+```
+
+--
+
+Macro wrapping the match macro.
+
+--
+
+Also defun-
+
+---
+
+ClojureScript
+
+```
+???
+```
+
+--
+
+Uhhh.... I'll probably port it soon?
+
+[https://github.com/killme2008/defun/issues/5](https://github.com/killme2008/defun/issues/5)
+
+---
+
+layout: false
+
+# How does it work in practice?
+
+* Lots of Erlang
+* [Falkland CMS](http://falkland-cms.com/) (incidental)
+* SEACAT (incidental)
+* [POSThere.io](http://github.com/path/posthere.io) (deliberate)
+* [clj-json-ld](http://github.com/SnootyMonkey/clj-json-ld) (maximal)
+* filter-map (maximal)
+
+---
+
+layout: true
+
+# Where does it hurt?
+
+---
+
+Problem - Myopic guards...
+
+```clojure
+...
+([hatfields mccoys :guard #(not-empty (intersection % ?) feuds]
+  (marriage-fueds hatfields mccoys fueds))
+...
+```
+
+---
+
+Work around - Pack it up nice!
+
+```clojure
+...
+[participants :guard #(not-empty (intersection (first %) (last %)) fueds]
+  (marriage-fueds hatfields mccoys fueds))
+...
+```
+
+---
+
+Problem - Nested #()s are not allowed...
+
+```clojure
+(match angles
+  [angles :guard #(every? #(= % 60) %)] :equilateral
+  [angles :guard #(some #(= % 90) %)] :right
+  [angles :guard #(some #(> % 90) %)] :obtuse
+  :else :acute)
+```
+
+--
+
+`IllegalStateException` Nested #()s are not allowed
+
+---
+
+Work around - Define the function.
+
+```clojure
+(match angles
+  [angles :guard #(every? equal_60? %)] :equilateral
+  [angles :guard #(some equal_90? %)] :right
+  [angles :guard #(some gt_90? %)] :obtuse
+  :else :acute)
+```
+
+---
+
+Problem - Linear pattern matching.
+
+```clojure
+(match pair 
+  [a a] :same
+  :else :different)
+```
+
+--
+
+`AssertionError` Pattern row 1: Pattern row reuses wildcards in [a a].  
+The following wildcards are ambiguous: a.
+There's no guarantee that the matched values will be same.
+Rename the occurrences uniquely.
+
+--
+
+Work around - Yeah... don't do that.
+
+---
+
+layout: true
+
+# Best Practice
+
+---
+
+Eliminate conditional as first expression of a function.
+
+--
+
+This is OK...
+
+```clojure
+(defn- update-item-response [coll-slug ctx]
+  (if (= (get-in ctx [:updated-item :slug]) (get-in ctx [:item :slug]))
+    ; it's in the same spot
+    (render-item (:updated-item ctx))
+    ; it moved
+    (item-location-response coll-slug (:updated-item ctx))))
+```
+
+---
+
+I think this can be better...
+
+```clojure
+(defn valid-new-resource
+  "Given the slug of the collection, the name of the resource, a map of a potential new resource,
+  and a retrieval function for the resource type, check if the everything is in order to create
+  the new resource.
+  Ensure the collection exists or return :bad-collection.
+  Ensure the name of the resource is specified or return :no-name.
+  Ensure the slug is valid and doesn't already exist if it's specified,
+  or return :invalid-slug or :slug-conflict respectively.
+  :property-conflict is returned if a property is included in the map of properties that is in
+  the reserved-properties set."
+  ([coll-slug resource-name type reserved-properties] (valid-new-resource coll-slug resource-name reserved-properties type {}))
+  ([coll-slug resource-name type reserved-properties {provided-slug :slug :as props}]
+    (if (:id (collection/get-collection coll-slug))
+      (cond
+        (or (nil? resource-name) (blank? resource-name)) :no-name
+        (not-empty (intersection (set (keys (keywordize-keys props))) reserved-properties)) :property-conflict
+        (not provided-slug) true
+        (not (common/valid-slug? provided-slug)) :invalid-slug
+        (nil? (get-resource coll-slug provided-slug type)) true
+        :else :slug-conflict)
+      :bad-collection)))
+```
+---
+
+This is more clear that we have 3 basic cases: arity/4, arity/5, and a "bad collection"...
+
+```clojure
+(defun valid-new-resource
+  "Given the slug of the collection, the name of the resource, a map of a potential new resource,
+  and a retrieval function for the resource type, check if the everything is in order to create
+  the new resource.
+  Ensure the collection exists or return :bad-collection.
+  Ensure the name of the resource is specified or return :no-name.
+  Ensure the slug is valid and doesn't already exist if it's specified,
+  or return :invalid-slug or :slug-conflict respectively.
+  :property-conflict is returned if a property is included in the map of properties that is in
+  the reserved-properties set."
+  ([coll-slug resource-name type reserved-properties] (valid-new-resource coll-slug resource-name reserved-properties type {}))
+  ([coll-slug :guard #(collection/get-collection %) resource-name type reserved-properties props]
+    (cond
+      (or (nil? resource-name) (blank? resource-name)) :no-name
+      (not-empty (intersection (set (keys (keywordize-keys props))) reserved-properties)) :property-conflict
+      (not (:slug props)) true
+      (not (common/valid-slug? (:slug props))) :invalid-slug
+      (nil? (get-resource coll-slug (:slug props) type)) true
+      :else :slug-conflict))
+   ([_ _ _ _ _] :bad-collection))
+```
+
+---
+
+Eliminate nested conditionals.
+
+
+```clojure
+(defun update-with-local-context
+  "Update an active context with a local context."
+
+  ;; If remote contexts is not passed, it is initialized to an empty array.
+  ([active-context local-context]
+    (update-with-local-context active-context local-context []))
+
+  ;; 2) If local context is not an array, set it to an array containing only local context.
+  ([active-context local-context :guard #(not (sequential? %)) remote-contexts]
+    (update-with-local-context active-context [local-context] remote-contexts))
+
+  ;; 1) Initialize result to the result of cloning active context.
+  ;; Our recursion accumulator starts as a "clone" of the active-context
+  ([active-context local-context remote-contexts]
+    (update-with-local-context active-context active-context local-context remote-contexts))
+
+  ([result _ local-context :guard #(empty? %) _]
+    result)
+
+  ([result active-context local-context remote-contexts]
+    (let [context (first local-context)]
+      ...)))
+ ```
+
+---
+
+Two-fer! 
+
+Eliminate conditional as first expression of a function.
+
+Eliminate nested conditionals.
+
+```clojure
+(defn- as-sequence [result]
+  (if (sequential? result)
+    result 
+    (if (nil? result)
+      []
+      [result])))
+```
+
+--
+
+```clojure
+(defun- as-sequence 
+  ([result :guard nil?] [])
+  ([result :guard sequential?] result)
+  ([result] [result]))
+```
+
+---
+
+Deal with numerous function inputs.
+
+```clojure
+(defun- expansion
+
+  ;; 1) If element is null, return null.
+  ([_ _ nil] nil)
+  
+  ;; 2) If element is a scalar,...
+  ([active-context active-property element :guard #(scalar? %)]
+    ...)
+
+  ;; 3) If element is an array, ...
+  ([active-context active-property element :guard #(sequential? %)]
+    ...)
+  
+  ;; 5) If element contains the key @context, set active context to the result of the Context Processing algorithm,
+  ;; passing active context and the value of the @context key as local context.
+  ([active-context active-property element :guard #(and (associative? %) (contains? % "@context"))]
+    ...)
+
+  ;; 4) Otherwise element is a JSON object.
+  ([active-context active-property element]
+    ...))
+```
+
+---
+layout: false
+
+# Best Practice
+
+Recursive function pattern (start, work, end)
+
+---
+
+layout: true
+
+# Best Practice
+
+Recursive function pattern (start, work, end)
+
+---
+
+```clojure
+=> (zipmap [:foo :bar :blat] ["foo" 42 true])
+{:blat true, :bar 42, :foo "foo"}
+```
+
+--
+
+Regular `zipmap` from Clojure source.
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+      map)))
+```
+
+--
+
+Recursive functions have 3 parts: **Start, Work, End**
+
+---
+
+Regular `zipmap` from Clojure source.
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+* (loop [map {}
+*        ks (seq keys)
+*        vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+      map)))
+```
+
+Start
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+*     (recur (assoc map (first ks) (first vs))
+*            (next ks)
+*            (next vs))
+      map)))
+```
+
+Work
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+*   (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+*     map)))
+```
+
+End
+
+---
+
+Recursion in Erlang is usually 3 or more pattern matching function definitions: **Start, Work, End**
+
+--
+
+```
+filter([Row|_OtherRows] = Rows, InvalidPairs) ->
+  ApplicableInvalidPairs = applicable_invalid_pairs(length(Row), InvalidPairs, []),
+  filter(Rows, [], ApplicableInvalidPairs).
+filter(Rows, _FilteredRows, []) ->
+  % there are no applicable invalid pairs so the rows are already filtered
+  Rows;   
+filter([], FilteredRows, _InvalidPairs) ->
+  % there are no more rows, so return the filtered rows that have accumulated
+  lists:reverse(FilteredRows);
+filter([Row | OtherRows], FilteredRows, InvalidPairs) ->
+  Filter = contains_invalid_pair(Row, InvalidPairs),
+  if
+    Filter ->
+      filter(OtherRows, FilteredRows, InvalidPairs);
+    true ->
+      filter(OtherRows, [Row|FilteredRows], InvalidPairs) % recurse to check the remaining rows
+  end.
+```
+
+---
+
+```
+* filter([Row|_OtherRows] = Rows, InvalidPairs) ->
+*   ApplicableInvalidPairs = applicable_invalid_pairs(length(Row), InvalidPairs, []),
+*   filter(Rows, [], ApplicableInvalidPairs).
+  filter(Rows, _FilteredRows, []) ->
+    % there are no applicable invalid pairs so the rows are already filtered
+    Rows;   
+  filter([], FilteredRows, _InvalidPairs) ->
+    % there are no more rows, so return the filtered rows that have accumulated
+    lists:reverse(FilteredRows);
+  filter([Row | OtherRows], FilteredRows, InvalidPairs) ->
+    Filter = contains_invalid_pair(Row, InvalidPairs),
+    if
+      Filter ->
+        filter(OtherRows, FilteredRows, InvalidPairs);
+      true ->
+        filter(OtherRows, [Row|FilteredRows], InvalidPairs) % recurse to check the remaining rows
+    end.
+```
+
+Start
+
+---
+
+```
+  filter([Row|_OtherRows] = Rows, InvalidPairs) ->
+    ApplicableInvalidPairs = applicable_invalid_pairs(length(Row), InvalidPairs, []),
+    filter(Rows, [], ApplicableInvalidPairs).
+  filter(Rows, _FilteredRows, []) ->
+    % there are no applicable invalid pairs so the rows are already filtered
+    Rows;   
+  filter([], FilteredRows, _InvalidPairs) ->
+    % there are no more rows, so return the filtered rows that have accumulated
+    lists:reverse(FilteredRows);
+* filter([Row | OtherRows], FilteredRows, InvalidPairs) ->
+*   Filter = contains_invalid_pair(Row, InvalidPairs),
+*   if
+*     Filter ->
+*       filter(OtherRows, FilteredRows, InvalidPairs);
+*     true ->
+*       filter(OtherRows, [Row|FilteredRows], InvalidPairs) % recurse to check the remaining rows
+*   end.
+```
+
+Work
+
+---
+
+```
+  filter([Row|_OtherRows] = Rows, InvalidPairs) ->
+    ApplicableInvalidPairs = applicable_invalid_pairs(length(Row), InvalidPairs, []),
+    filter(Rows, [], ApplicableInvalidPairs).
+* filter(Rows, _FilteredRows, []) ->
+*   % there are no applicable invalid pairs so the rows are already filtered
+*   Rows;   
+* filter([], FilteredRows, _InvalidPairs) ->
+*   % there are no more rows, so return the filtered rows that have accumulated
+*   lists:reverse(FilteredRows);
+  filter([Row | OtherRows], FilteredRows, InvalidPairs) ->
+    Filter = contains_invalid_pair(Row, InvalidPairs),
+    if
+      Filter ->
+        filter(OtherRows, FilteredRows, InvalidPairs);
+      true ->
+        filter(OtherRows, [Row|FilteredRows], InvalidPairs) % recurse to check the remaining rows
+    end.
+```
+
+End
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+      map)))
+```
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+      map)))
+
+(defun zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  ([keys vals] (recur {} (seq keys) (seq vals)))
+  ([map ks :guard empty? vs] map)
+  ([map ks vs :guard empty?] map)
+  ([map ks vs] (recur (assoc map (first ks) (first vs)) (next ks) (next vs))))
+```
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+* (loop [map {}
+*        ks (seq keys)
+*        vs (seq vals)]
+    (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+      map)))
+
+(defun zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+* ([keys vals] (recur {} (seq keys) (seq vals)))
+  ([map ks :guard empty? vs] map)
+  ([map ks vs :guard empty?] map)
+  ([map ks vs] (recur (assoc map (first ks) (first vs)) (next ks) (next vs))))
+```
+
+Start
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+    (if (and ks vs)
+*     (recur (assoc map (first ks) (first vs))
+*            (next ks)
+*            (next vs))
+      map)))
+
+(defun zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  ([keys vals] (recur {} (seq keys) (seq vals)))
+  ([map ks :guard empty? vs] map)
+  ([map ks vs :guard empty?] map)
+* ([map ks vs] (recur (assoc map (first ks) (first vs)) (next ks) (next vs))))
+```
+
+Work
+
+---
+
+```clojure
+(defn zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  [keys vals]
+  (loop [map {}
+         ks (seq keys)
+         vs (seq vals)]
+*   (if (and ks vs)
+      (recur (assoc map (first ks) (first vs))
+             (next ks)
+             (next vs))
+*     map)))
+
+(defun zipmap
+  "Returns a map with the keys mapped to the corresponding vals."
+  ([keys vals] (recur {} (seq keys) (seq vals)))
+* ([map ks :guard empty? vs] map)
+* ([map ks vs :guard empty?] map)
+  ([map ks vs] (recur (assoc map (first ks) (first vs)) (next ks) (next vs))))
+```
+
+End
+
+---
+
+```clojure
+(defun zipmap-filter
+  "Returns a map with the keys mapped to the corresponding values for the keys and values that satisfy the predicate."
+  ([pred :guard #(not (associative? %)) ks vs] (recur {} [pred (seq ks)] [pred (seq vs)]))
+  ([key-pred value-pred ks vs] (recur {} [key-pred (seq ks)] [value-pred (seq vs)]))
+  ([map ks-tuple :guard #(empty? (last %)) vs-tuple] map)
+  ([map ks-tuple vs-tuple :guard #(empty? (last %))] map)
+  ([map ks-tuple :guard #(not ((first %) (first (last %)))) vs-tuple] (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple :guard #(not ((first %) (first (last %))))] (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple] (recur (assoc map (first (last ks-tuple)) (first (last vs-tuple))) [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))])))
+```
+
+--
+
+```clojure
+=> (zipmap-filter identity [:foo :bar :blat false] [1 nil 3 4])
+{:blat 3, :foo 1}
+```
+
+--
+
+```clojure
+=> (zipmap-filter keyword? identity [:foo "bar" :blat] [1 2 3])
+{:blat 3, :foo 1}
+```
+--
+
+```clojure
+=> (zipmap-filter identity odd? [:foo :bar :blat] [1 2 3])
+{:blat 3, :foo 1}
+```
+
+---
+
+```clojure
+(defun zipmap-filter
+  "Returns a map with the keys mapped to the corresponding values for the keys and values that satisfy the predicate."
+* ([pred :guard #(not (associative? %)) ks vs] (recur {} [pred (seq ks)] [pred (seq vs)]))
+* ([key-pred value-pred ks vs] (recur {} [key-pred (seq ks)] [value-pred (seq vs)]))
+  ([map ks-tuple :guard #(empty? (last %)) vs-tuple] map)
+  ([map ks-tuple vs-tuple :guard #(empty? (last %))] map)
+  ([map ks-tuple :guard #(not ((first %) (first (last %)))) vs-tuple]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple :guard #(not ((first %) (first (last %))))]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple]
+    (recur
+      (assoc map (first (last ks-tuple)) (first (last vs-tuple)))
+      [(first ks-tuple) (next (last ks-tuple))]
+      [(first vs-tuple) (next (last vs-tuple))])))
+```
+
+Start (+ pack it up nice)
+
+---
+
+```clojure
+(defun zipmap-filter
+  "Returns a map with the keys mapped to the corresponding values for the keys and values that satisfy the predicate."
+  ([pred :guard #(not (associative? %)) ks vs] (recur {} [pred (seq ks)] [pred (seq vs)]))
+  ([key-pred value-pred ks vs] (recur {} [key-pred (seq ks)] [value-pred (seq vs)]))
+  ([map ks-tuple :guard #(empty? (last %)) vs-tuple] map)
+  ([map ks-tuple vs-tuple :guard #(empty? (last %))] map)
+* ([map ks-tuple :guard #(not ((first %) (first (last %)))) vs-tuple]
+*   (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+* ([map ks-tuple vs-tuple :guard #(not ((first %) (first (last %))))]
+*   (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple]
+    (recur
+      (assoc map (first (last ks-tuple)) (first (last vs-tuple)))
+      [(first ks-tuple) (next (last ks-tuple))]
+      [(first vs-tuple) (next (last vs-tuple))])))
+```
+
+Work - skip
+
+---
+
+```clojure
+(defun zipmap-filter
+  "Returns a map with the keys mapped to the corresponding values for the keys and values that satisfy the predicate."
+  ([pred :guard #(not (associative? %)) ks vs] (recur {} [pred (seq ks)] [pred (seq vs)]))
+  ([key-pred value-pred ks vs] (recur {} [key-pred (seq ks)] [value-pred (seq vs)]))
+  ([map ks-tuple :guard #(empty? (last %)) vs-tuple] map)
+  ([map ks-tuple vs-tuple :guard #(empty? (last %))] map)
+  ([map ks-tuple :guard #(not ((first %) (first (last %)))) vs-tuple]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple :guard #(not ((first %) (first (last %))))]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+* ([map ks-tuple vs-tuple]
+*   (recur
+*     (assoc map (first (last ks-tuple)) (first (last vs-tuple)))
+*     [(first ks-tuple) (next (last ks-tuple))]
+*     [(first vs-tuple) (next (last vs-tuple))])))
+```
+
+Work - keep
+
+---
+
+```clojure
+(defun zipmap-filter
+  "Returns a map with the keys mapped to the corresponding values for the keys and values that satisfy the predicate."
+  ([pred :guard #(not (associative? %)) ks vs] (recur {} [pred (seq ks)] [pred (seq vs)]))
+  ([key-pred value-pred ks vs] (recur {} [key-pred (seq ks)] [value-pred (seq vs)]))
+* ([map ks-tuple :guard #(empty? (last %)) vs-tuple] map)
+* ([map ks-tuple vs-tuple :guard #(empty? (last %))] map)
+  ([map ks-tuple :guard #(not ((first %) (first (last %)))) vs-tuple]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple :guard #(not ((first %) (first (last %))))]
+    (recur map [(first ks-tuple) (next (last ks-tuple))] [(first vs-tuple) (next (last vs-tuple))]))
+  ([map ks-tuple vs-tuple]
+    (recur
+      (assoc map (first (last ks-tuple)) (first (last vs-tuple)))
+      [(first ks-tuple) (next (last ks-tuple))]
+      [(first vs-tuple) (next (last vs-tuple))])))
+```
+
+End
+
+---
+
+layout: false
+
+# Take-aways!
+
+Anywhere you see conditionals, especially nested, think patterns!
+
+* Patterns aren't new, rich history in PL
+* Simpler, more declarative code
+* Use [core.match](https://github.com/clojure/core.match) and [defun](https://github.com/killme2008/defun) for great good!
+* Best practices for using pattern matching:
+  * Eliminate conditional as first expression of a function
+  * Eliminate nested conditionals
+  * Deal with numerous function inputs
+  * Recursive function pattern (start, work, end)
+
+---
+
+# Other Pattern Matching Libraries
+
+* [Matchure](http://spin.atomicobject.com/2010/04/25/matchure-serious-clojure-pattern-matching/)
+* [Comprehend]([http://jdevuyst.blogspot.com/2014/05/comprehend-clojure-pattern-matching.html])
+
+.footnote[I haven't used these.]
+---
+
+# Resources
+
+* This presentation: [URL](URL)
+* destructuring: [ClojureBridge](https://clojurebridge.github.io/community-docs/docs/clojure/destructuring/)
+* core.match: [https://github.com/clojure/core.match](https://github.com/clojure/core.match)
+* defun: [https://github.com/killme2008/defun](https://github.com/killme2008/defun)
+* Some projects using pattern matching:
+  * [Falkland CMS](http://falkland-cms.com/) (incidental)
+  * [POSThere.io](http://github.com/path/posthere.io) (deliberate)
+  * [clj-json-ld](http://github.com/SnootyMonkey/clj-json-ld) (maximal)
+* Good remote jobs! [Path](http://path.com) - [http://path.com/jobs](http://path.com/jobs)
+
+
+    </textarea>
+    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript">
+    </script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
